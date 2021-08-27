@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-#   coding: utf-8
+# coding: utf-8
 
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}'
   if 0;                         # not running under some shell
@@ -308,6 +308,7 @@ use XMLTV::Usage <<END
     [--show_url] [--save_json]
     [--no_cryptedcplus] [--no_cryptedpprem] [--no_htmltags]
     [--casting] [--no-optim]
+    [--tvheadend]    
     prefix, postfix : strings, "" for null string
     To show capabilities : $0 --capabilities
     To show version      : $0 --version
@@ -358,6 +359,7 @@ sub grab_day($);
 sub grab_day_channel($$$$$$);
 sub debug_print(@);
 sub get_page_json($$$);
+sub format_categorie($);
 
 #***************************************************************************
 # Main declarations
@@ -384,8 +386,8 @@ XMLTV::Memoize::check_argv('XMLTV::Get_nice::get_nice_aux') # cache on disk
 
 my ($opt_days, $opt_help, $opt_output, $opt_offset, $opt_gui, $opt_quiet,
     $opt_list_channels, $opt_config_file, $opt_configure, $opt_morechannels, $opt_logo_path,
-    $no_episodedesc, $no_aggregatecat, $show_url, $save_json, $no_cryptedcplus, $no_cryptedpprem,
-    $no_htmltags, $opt_casting, $opt_no_optim );
+    $no_episodedesc, $no_aggregatecat, $tvheadend, $show_url, $save_json, $no_cryptedcplus, 
+    $no_cryptedpprem, $no_htmltags, $opt_casting, $opt_no_optim );
 
 # debug
 if ($DEBUG_CMD) {
@@ -412,6 +414,7 @@ GetOptions('days=i'     => \$opt_days,
            'ch_postfix=s'  => \$channel_postfix,
            'no_episodedesc' => \$no_episodedesc,
            'no_aggregatecat' => \$no_aggregatecat,
+           'tvheadend' => \$tvheadend,
            'show_url' => \$show_url,
            'save_json' => \$save_json,
            'no_cryptedcplus' => \$no_cryptedcplus,
@@ -1249,7 +1252,11 @@ sub grab_day_channel($$$$$$) {
         }
       }
       if ($subgenre ne '') {
-        push @{$prog{category}}, [ xmlencoding($subgenre), $LANG ];
+        if ($tvheadend) {
+            $subgenre = format_categorie($subgenre);
+        }
+
+        push @{$prog{category}}, [ xmlencoding($subgenre), $LANG ];        
       }
     }
 
@@ -1274,12 +1281,24 @@ sub grab_day_channel($$$$$$) {
     if ($age == 0) {
       push @{$prog{rating}}, [ "Tout public", "CSA", [] ];
     } else {
-      push @{$prog{rating}}, [ $age, "CSA", [ {src => $icon}] ];
+      if ($tvheadend) {
+        push @{$prog{rating}}, [ $age * -1, "CSA", [ {src => $icon}] ];  
+      } else {
+        push @{$prog{rating}}, [ $age, "CSA", [ {src => $icon}] ];
+      }
     }
 
     # étoiles T
-    $prog{'star-rating'} = [$line->{'note_telerama'}."/5"] if ($line->{'note_telerama'});
-
+    if ($line->{'note_telerama'})
+    {
+      if ($tvheadend) {
+        $prog{'star-rating'} = [$line->{'note_telerama'} * 20];
+        #debug_print("   Note ".$prog{'star-rating'}[0]."\n");
+      } else {
+        $prog{'star-rating'} = [$line->{'note_telerama'}."/5"];
+      }
+    }
+    
     $writer->write_programme(\%prog);
   }
   return;
@@ -1335,4 +1354,69 @@ sub get_page_json( $$$ ) {
   }
 
   return $json;
+}
+
+sub format_categorie( $ ) {
+  my ($categorie) = @_;
+  
+  my $subgenre = $categorie;
+
+  if ($categorie =~ m/clip/) {
+    $subgenre = "Music / Ballet / Dance";
+  } elsif ($categorie =~ m%/concert/%) {
+    $subgenre = "Music / Ballet / Dance";
+  } elsif ($categorie =~ m/débat/) {
+    $subgenre = "Social / Political issues / Economics";
+  } elsif ($categorie =~ m/dessin animé/) {
+    $subgenre = "Children's / Youth programmes";
+  } elsif ($categorie =~ m/divertissement/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/documentaire/) {
+    $subgenre = "Education / Science / Factual topics";
+  } elsif ($categorie =~ m/émission/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/feuilleton/) {
+    $subgenre = "Movie / Drama";
+  } elsif ($categorie =~ m/film/) {
+    $subgenre = "Movie / Drama";
+  } elsif ($categorie =~ m/fitness/) {
+    $subgenre = "Sports";    
+  } elsif ($categorie =~ m/humour/) {
+    $subgenre = "Show / Game show";    
+  } elsif ($categorie =~ m/interview/) {
+    $subgenre = "News / Current affairs";
+  } elsif ($categorie =~ m/jeu/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/jeunesse/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/journal/) {
+    $subgenre = "News / Current affairs";    
+  } elsif ($categorie =~ m/loterie/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/magazine/) {
+    $subgenre = "Education / Science / Factual topics";
+  } elsif ($categorie =~ m/météo/) {
+    $subgenre = "News / Current affairs";
+  } elsif ($categorie =~ m/politique/) {
+    $subgenre = "Social / Political issues / Economics";
+  } elsif ($categorie =~ m/série/) {
+    $subgenre = "Movie / Drama";
+  } elsif ($categorie =~ m/spectacle/) {
+    $subgenre = "Arts / Culture (without music)";
+  } elsif ($categorie =~ m/sport/) {
+    $subgenre = "Sports";
+  } elsif ($categorie =~ m/talk-show/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/téléfilm/) {
+    $subgenre = "Movie / Drama";
+  } elsif ($categorie =~ m/téléréalité/) {
+    $subgenre = "Show / Game show";
+  } elsif ($categorie =~ m/théâtre/) {
+    $subgenre = "Arts / Culture (without music)";
+  } elsif ($categorie =~ m/variétés/) {
+    $subgenre = "Arts / Culture (without music)";
+  } else {
+    #debug_print("   Pas de correspondance ".$categorie."\n");
+  }
+  return $subgenre
 }
